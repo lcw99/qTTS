@@ -34,7 +34,7 @@ phoneme_path = "/home/chang/bighard/AI/tts/dataset/kss/phoneme_cache_g2p_ko/"
 batch_size = 32
 if colab:
     data_path = "/content/drive/MyDrive/tts/dataset/kss/"
-    phoneme_path = "/content/drive/MyDrive/tts/phoneme_cache_g2p_ko"
+    phoneme_path = "/content/drive/MyDrive/tts/dataset/kss/phoneme_cache_g2p_ko"
     batch_size = 32
     num_worker = 4
     
