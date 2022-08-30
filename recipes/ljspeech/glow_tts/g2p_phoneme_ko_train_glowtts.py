@@ -27,6 +27,7 @@ output_path = os.path.dirname(os.path.abspath(__file__))
 # Set LJSpeech as our target dataset and define its path.
 # You can also use a simple Dict to define the dataset and pass it to your custom formatter.
 data_path = "/home/chang/bighard/AI/tts/dataset/kss/"
+num_worker=8
 if Path("/mnt/ramdisk/kss").is_dir():
     print("ramdisk exists...")
     data_path = "/mnt/ramdisk/kss"
@@ -34,8 +35,9 @@ phoneme_path = "/home/chang/bighard/AI/tts/dataset/kss/phoneme_cache_g2p_ko/"
 batch_size = 32
 if colab:
     data_path = "/content/drive/MyDrive/tts/dataset/kss/"
-    phoneme_path = "/content/drive/MyDrive/tts/phoneme_cache_g2p_ko"
+    phoneme_path = "/content/drive/MyDrive/tts/dataset/kss/phoneme_cache_g2p_ko/"
     batch_size = 32
+    num_worker=4
     
 dataset_config = BaseDatasetConfig(
     name="kss_ko",
@@ -55,7 +57,7 @@ config = GlowTTSConfig(
     audio=audio_config,
     batch_size=batch_size,
     eval_batch_size=16,
-    num_loader_workers=8,
+    num_loader_workers=num_worker,
     num_eval_loader_workers=4,
     precompute_num_workers=4,
     run_eval=True,
