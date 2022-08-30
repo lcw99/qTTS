@@ -1,18 +1,13 @@
 import os
 from pathlib import Path
+from re import T
 
-# Trainer: Where the ✨️ happens.
-# TrainingArgs: Defines the set of arguments of the Trainer.
 from trainer import Trainer, TrainerArgs
 
-# GlowTTSConfig: all model related values for training, validating and testing.
-from TTS.config.shared_configs import BaseAudioConfig
-from TTS.tts.configs.glow_tts_config import GlowTTSConfig
-
-# BaseDatasetConfig: defines name, formatter and path of the dataset.
-from TTS.tts.configs.shared_configs import BaseDatasetConfig
+from TTS.config import BaseAudioConfig, BaseDatasetConfig
+from TTS.tts.configs.speedy_speech_config import SpeedySpeechConfig
 from TTS.tts.datasets import load_tts_samples
-from TTS.tts.models.glow_tts import GlowTTS
+from TTS.tts.models.forward_tts import ForwardTTS
 from TTS.tts.utils.text.tokenizer import TTSTokenizer
 from TTS.utils.audio import AudioProcessor
 
@@ -48,17 +43,26 @@ dataset_config = BaseDatasetConfig(
 audio_config = BaseAudioConfig(
     sample_rate=22050,
     resample=True,
+    do_trim_silence=True,
+    trim_db=60.0,
+    signal_norm=False,
+    mel_fmin=0.0,
+    mel_fmax=8000,
+    spec_gain=1.0,
+    log_func="np.log",
+    ref_level_db=20,
+    preemphasis=0.0,
 )
-# INITIALIZE THE TRAINING CONFIGURATION
-# Configure the model. Every config class inherits the BaseTTSConfig.
-config = GlowTTSConfig(
-    run_name="glow_tts_ko_phoneme_g2p",
+
+config = SpeedySpeechConfig(
+    run_name="speedy_speech_ko",
     audio=audio_config,
-    batch_size=batch_size,
+    batch_size=32,
     eval_batch_size=16,
     num_loader_workers=num_worker,
     num_eval_loader_workers=4,
     precompute_num_workers=num_worker,
+    compute_input_seq_cache=True,
     run_eval=True,
     test_delay_epochs=-1,
     epochs=1000,
@@ -67,21 +71,12 @@ config = GlowTTSConfig(
     phoneme_language="ko",
     phoneme_cache_path=phoneme_path,
     print_step=50,
-    save_step=5000,
     print_eval=False,
     mixed_precision=True,
+    max_seq_len=500000,
     output_path=output_path,
     datasets=[dataset_config],
-    test_sentences = [
-        "목소리를 만드는데는 오랜 시간이 걸린다, 인내심이 필요하다.",
-        "목소리가 되어라, 메아리가 되지말고.",
-        "철수야 미안하다. 아무래도 그건 못하겠다.",
-        "이 케익은 정말 맛있다. 촉촉하고 달콤하다.",
-        "1963년 11월 23일 이전",
-    ],
 )
-config.encoder_params["num_heads"] = 2
-config.encoder_params["num_layers"] = 8
 
 # INITIALIZE THE AUDIO PROCESSOR
 # Audio processor is used for feature extraction and audio I/O.
@@ -104,7 +99,6 @@ tokenizer, config = TTSTokenizer.init_from_config(config)
 #     eval_split_max_size=config.eval_split_max_size,
 #     eval_split_size=config.eval_split_size,
 # )
-
 def formatter(root_path, manifest_file, **kwargs):  # pylint: disable=unused-argument
     """Assumes each line as ```<filename>|<transcription>```
     """
@@ -133,11 +127,8 @@ train_samples, eval_samples = load_tts_samples(
     eval_split_size=config.eval_split_size,
     formatter=formatter)
 
-# INITIALIZE THE MODEL
-# Models take a config object and a speaker manager as input
-# Config defines the details of the model like the number of layers, the size of the embedding, etc.
-# Speaker manager is used by multi-speaker models.
-model = GlowTTS(config, ap, tokenizer, speaker_manager=None)
+# init model
+model = ForwardTTS(config, ap, tokenizer)
 
 # INITIALIZE THE TRAINER
 # Trainer provides a generic API to train all the 🐸TTS models with all its perks like mixed-precision training,
