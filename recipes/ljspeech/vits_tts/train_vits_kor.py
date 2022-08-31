@@ -22,7 +22,7 @@ num_worker=4
 # DEFINE DATASET CONFIG
 # Set LJSpeech as our target dataset and define its path.
 # You can also use a simple Dict to define the dataset and pass it to your custom formatter.
-data_path = "/home/chang/bighard/AI/tts/dataset/kss/"
+data_path = "/home/chang/bighard/AI/tts/dataset/kss22020/"
 if Path("/mnt/ramdisk/kss").is_dir():
     print("ramdisk exists...")
     data_path = "/mnt/ramdisk/kss"
