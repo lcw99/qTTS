@@ -1,4 +1,5 @@
 import os
+import random
 from re import T
 from pathlib import Path
 
@@ -22,7 +23,7 @@ num_worker=4
 # DEFINE DATASET CONFIG
 # Set LJSpeech as our target dataset and define its path.
 # You can also use a simple Dict to define the dataset and pass it to your custom formatter.
-data_path = "/home/chang/bighard/AI/tts/dataset/kss22020/"
+data_path = "/home/chang/bighard/AI/tts/dataset/kss22050/"
 if Path("/mnt/ramdisk/kss").is_dir():
     print("ramdisk exists...")
     data_path = "/mnt/ramdisk/kss"
@@ -62,20 +63,13 @@ config = VitsConfig(
     phoneme_language="ko",
     phoneme_cache_path=phoneme_path,
     compute_input_seq_cache=True,
-    print_step=25,
+    print_step=50,
     print_eval=True,
     mixed_precision=True,
     output_path=output_path,
     datasets=[dataset_config],
     cudnn_benchmark=False,
-    min_audio_len=1,
-    max_audio_len=2205000,
     test_sentences = [
-        ["목소리를 만드는데는 오랜 시간이 걸린다, 인내심이 필요하다."],
-        ["목소리가 되어라, 메아리가 되지말고."],
-        ["철수야 미안하다. 아무래도 그건 못하겠다."],
-        ["이 케익은 정말 맛있다. 촉촉하고 달콤하다."],
-        ["1963년 11월 23일 이전"],
     ],
     # test_sentences = [
     #         ["It took me quite a long time to develop a voice, and now that I have it I'm not going to be silent."],
@@ -127,7 +121,9 @@ def formatter(root_path, manifest_file, **kwargs):  # pylint: disable=unused-arg
     speaker_name = "KBSVoice"
     with open(txt_file, "r", encoding="utf-8") as ttf:
         cnt = 0
-        for line in ttf:
+        batch_coll = ttf.readlines()
+        #batch_coll = random.choices(batch_coll, k=1000)
+        for line in batch_coll:
             cols = line.split("|")
             wav_file = os.path.join(root_path, cols[0])
             text = cols[1]
@@ -135,6 +131,8 @@ def formatter(root_path, manifest_file, **kwargs):  # pylint: disable=unused-arg
                 continue    
             items.append({"text":text, "audio_file":wav_file, "speaker_name":speaker_name})
             cnt += 1
+            #if cnt >= 1000:
+            #    break
     return items
 
 # load training samples

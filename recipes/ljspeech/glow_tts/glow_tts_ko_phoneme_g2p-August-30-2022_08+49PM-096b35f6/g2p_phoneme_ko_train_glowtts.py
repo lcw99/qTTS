@@ -22,21 +22,22 @@ if 'COLAB_GPU' in os.environ:
 
 # we use the same path as this script as our training folder.
 output_path = os.path.dirname(os.path.abspath(__file__))
-num_worker=8
+
 # DEFINE DATASET CONFIG
 # Set LJSpeech as our target dataset and define its path.
 # You can also use a simple Dict to define the dataset and pass it to your custom formatter.
-data_path = "/home/chang/bighard/AI/tts/dataset/kss/"
+data_path = "/home/chang/bighard/AI/tts/dataset/kss22050/"
+num_worker=8
 if Path("/mnt/ramdisk/kss").is_dir():
     print("ramdisk exists...")
-    data_path = "/mnt/ramdisk/kss"
+    data_path = "/mnt/ramdisk/kss22050"
 phoneme_path = "/home/chang/bighard/AI/tts/dataset/kss/phoneme_cache_g2p_ko/"
 batch_size = 32
 if colab:
     data_path = "/content/drive/MyDrive/tts/dataset/kss/"
-    phoneme_path = "/content/drive/MyDrive/tts/dataset/kss/phoneme_cache_g2p_ko"
+    phoneme_path = "/content/drive/MyDrive/tts/dataset/kss/phoneme_cache_g2p_ko/"
     batch_size = 32
-    num_worker = 4
+    num_worker=4
     
 dataset_config = BaseDatasetConfig(
     name="kss_ko",
@@ -47,7 +48,7 @@ dataset_config = BaseDatasetConfig(
 
 audio_config = BaseAudioConfig(
     sample_rate=22050,
-    resample=True,
+    #resample=True,
 )
 # INITIALIZE THE TRAINING CONFIGURATION
 # Configure the model. Every config class inherits the BaseTTSConfig.
@@ -73,11 +74,11 @@ config = GlowTTSConfig(
     output_path=output_path,
     datasets=[dataset_config],
     test_sentences = [
-        "목소리를 만드는데는 오랜 시간이 걸린다, 인내심이 필요하다.",
-        "목소리가 되어라, 메아리가 되지말고.",
-        "철수야 미안하다. 아무래도 그건 못하겠다.",
-        "이 케익은 정말 맛있다. 촉촉하고 달콤하다.",
-        "1963년 11월 23일 이전",
+        # "목소리를 만드는데는 오랜 시간이 걸린다, 인내심이 필요하다.",
+        # "목소리가 되어라, 메아리가 되지말고.",
+        # "철수야 미안하다. 아무래도 그건 못하겠다.",
+        # "이 케익은 정말 맛있다. 촉촉하고 달콤하다.",
+        # "1963년 11월 23일 이전",
     ],
 )
 config.encoder_params["num_heads"] = 2

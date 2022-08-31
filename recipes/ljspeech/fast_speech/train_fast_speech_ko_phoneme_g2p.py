@@ -1,20 +1,15 @@
 import os
 from pathlib import Path
 
-# Trainer: Where the ✨️ happens.
-# TrainingArgs: Defines the set of arguments of the Trainer.
 from trainer import Trainer, TrainerArgs
 
-# GlowTTSConfig: all model related values for training, validating and testing.
-from TTS.config.shared_configs import BaseAudioConfig
-from TTS.tts.configs.glow_tts_config import GlowTTSConfig
-
-# BaseDatasetConfig: defines name, formatter and path of the dataset.
-from TTS.tts.configs.shared_configs import BaseDatasetConfig
+from TTS.config import BaseAudioConfig, BaseDatasetConfig
+from TTS.tts.configs.fast_speech_config import FastSpeechConfig
 from TTS.tts.datasets import load_tts_samples
-from TTS.tts.models.glow_tts import GlowTTS
+from TTS.tts.models.forward_tts import ForwardTTS
 from TTS.tts.utils.text.tokenizer import TTSTokenizer
 from TTS.utils.audio import AudioProcessor
+from TTS.utils.manage import ModelManager
 
 colab = False
 if 'COLAB_GPU' in os.environ:
@@ -22,22 +17,21 @@ if 'COLAB_GPU' in os.environ:
 
 # we use the same path as this script as our training folder.
 output_path = os.path.dirname(os.path.abspath(__file__))
-
+num_worker=4
 # DEFINE DATASET CONFIG
 # Set LJSpeech as our target dataset and define its path.
 # You can also use a simple Dict to define the dataset and pass it to your custom formatter.
 data_path = "/home/chang/bighard/AI/tts/dataset/kss22050/"
-num_worker=8
 if Path("/mnt/ramdisk/kss").is_dir():
     print("ramdisk exists...")
     data_path = "/mnt/ramdisk/kss22050"
 phoneme_path = "/home/chang/bighard/AI/tts/dataset/kss/phoneme_cache_g2p_ko/"
-batch_size = 32
+batch_size = 16
 if colab:
     data_path = "/content/drive/MyDrive/tts/dataset/kss/"
-    phoneme_path = "/content/drive/MyDrive/tts/dataset/kss/phoneme_cache_g2p_ko/"
+    phoneme_path = "/content/drive/MyDrive/tts/dataset/kss/phoneme_cache_g2p_ko"
     batch_size = 32
-    num_worker=4
+    num_worker = 4
     
 dataset_config = BaseDatasetConfig(
     name="kss_ko",
@@ -48,29 +42,40 @@ dataset_config = BaseDatasetConfig(
 
 audio_config = BaseAudioConfig(
     sample_rate=22050,
-    #resample=True,
+    resample=colab,
+    do_trim_silence=True,
+    trim_db=60.0,
+    signal_norm=False,
+    mel_fmin=0.0,
+    mel_fmax=8000,
+    spec_gain=1.0,
+    log_func="np.log",
+    ref_level_db=20,
+    preemphasis=0.0,
 )
-# INITIALIZE THE TRAINING CONFIGURATION
-# Configure the model. Every config class inherits the BaseTTSConfig.
-config = GlowTTSConfig(
-    run_name="glow_tts_ko_phoneme_g2p",
+
+config = FastSpeechConfig(
+    run_name="fast_speech_kss_ko_phoneme_g2p",
     audio=audio_config,
-    batch_size=batch_size,
+    batch_size=32,
     eval_batch_size=16,
-    num_loader_workers=num_worker,
+    num_loader_workers=4,
     num_eval_loader_workers=4,
-    precompute_num_workers=num_worker,
+    compute_input_seq_cache=True,
+    compute_f0=False,
     run_eval=True,
     test_delay_epochs=-1,
     epochs=1000,
     text_cleaner="korean_phoneme_cleaners_g2p",
     use_phonemes=True,
     phoneme_language="ko",
-    phoneme_cache_path=phoneme_path,
+    phoneme_cache_path=os.path.join(output_path, "phoneme_cache_ko"),
+    precompute_num_workers=4,
     print_step=50,
     save_step=5000,
     print_eval=False,
     mixed_precision=True,
+    max_seq_len=500000,
     output_path=output_path,
     datasets=[dataset_config],
     test_sentences = [
@@ -81,8 +86,17 @@ config = GlowTTSConfig(
         # "1963년 11월 23일 이전",
     ],
 )
-config.encoder_params["num_heads"] = 2
-config.encoder_params["num_layers"] = 8
+
+config.model_args.use_pitch = False
+config.model_args.use_aligner = True
+# compute alignments
+if not config.model_args.use_aligner:
+    manager = ModelManager()
+    model_path, config_path, _ = manager.download_model("tts_models/en/ljspeech/tacotron2-DCA")
+    # TODO: make compute_attention python callable
+    os.system(
+        f"python TTS/bin/compute_attention_masks.py --model_path {model_path} --config_path {config_path} --dataset ljspeech --dataset_metafile metadata.csv --data_path ./recipes/ljspeech/LJSpeech-1.1/  --use_cuda true"
+    )
 
 # INITIALIZE THE AUDIO PROCESSOR
 # Audio processor is used for feature extraction and audio I/O.
@@ -119,7 +133,7 @@ def formatter(root_path, manifest_file, **kwargs):  # pylint: disable=unused-arg
             wav_file = os.path.join(root_path, cols[0])
             text = cols[1]
             if len(text) <= 5:
-                continue            
+                continue
             items.append({"text":text, "audio_file":wav_file, "speaker_name":speaker_name})
             #cnt += 1
             #if cnt >= 10000:
@@ -127,25 +141,19 @@ def formatter(root_path, manifest_file, **kwargs):  # pylint: disable=unused-arg
             #    break
     return items
 
-train_samples, eval_samples = load_tts_samples(
-    dataset_config, 
+# load training samples
+train_samples, eval_samples = load_tts_samples(dataset_config, 
     eval_split=True, 
     eval_split_max_size=config.eval_split_max_size,
     eval_split_size=config.eval_split_size,
-    formatter=formatter)
+    formatter=formatter
+)
 
-# INITIALIZE THE MODEL
-# Models take a config object and a speaker manager as input
-# Config defines the details of the model like the number of layers, the size of the embedding, etc.
-# Speaker manager is used by multi-speaker models.
-model = GlowTTS(config, ap, tokenizer, speaker_manager=None)
+# init the model
+model = ForwardTTS(config, ap, tokenizer)
 
-# INITIALIZE THE TRAINER
-# Trainer provides a generic API to train all the 🐸TTS models with all its perks like mixed-precision training,
-# distributed training, etc.
+# init the trainer and 🚀
 trainer = Trainer(
     TrainerArgs(), config, output_path, model=model, train_samples=train_samples, eval_samples=eval_samples
 )
-
-# AND... 3,2,1... 🚀
 trainer.fit()
