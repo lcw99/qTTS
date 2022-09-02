@@ -175,6 +175,7 @@ def korean_phoneme_cleaners_g2p(text):
 def korean_phoneme_cleaners_with_g2p_jamo_split(text):
     """Pipeline for Korean text, including number and abbreviation expansion."""
     text = multilingual_cleaners(text)
+    text = ko_normalize(text)
     text = g2p(text)
-    text = split_syllables(text)
+    text = ko_tokenize(text)
     return text

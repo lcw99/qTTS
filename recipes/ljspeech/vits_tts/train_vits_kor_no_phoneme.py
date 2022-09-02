@@ -1,21 +1,17 @@
 import os
 import random
+from re import T
 from pathlib import Path
 
-# Trainer: Where the ✨️ happens.
-# TrainingArgs: Defines the set of arguments of the Trainer.
 from trainer import Trainer, TrainerArgs
 
-# GlowTTSConfig: all model related values for training, validating and testing.
-from TTS.config.shared_configs import BaseAudioConfig
-from TTS.tts.configs.glow_tts_config import GlowTTSConfig
-
-# BaseDatasetConfig: defines name, formatter and path of the dataset.
 from TTS.tts.configs.shared_configs import BaseDatasetConfig
+from TTS.tts.configs.vits_config import VitsConfig
 from TTS.tts.datasets import load_tts_samples
-from TTS.tts.models.glow_tts import GlowTTS
+from TTS.tts.models.vits import Vits, VitsAudioConfig, CharactersConfig
 from TTS.tts.utils.text.tokenizer import TTSTokenizer
 from TTS.utils.audio import AudioProcessor
+from dataclasses import dataclass, field
 
 colab = False
 if 'COLAB_GPU' in os.environ:
@@ -23,67 +19,75 @@ if 'COLAB_GPU' in os.environ:
 
 # we use the same path as this script as our training folder.
 output_path = os.path.dirname(os.path.abspath(__file__))
-
+num_worker=4
 # DEFINE DATASET CONFIG
 # Set LJSpeech as our target dataset and define its path.
 # You can also use a simple Dict to define the dataset and pass it to your custom formatter.
 data_path = "/home/chang/bighard/AI/tts/dataset/kss22050/"
-num_worker=4
 if Path("/mnt/ramdisk/kss").is_dir():
     print("ramdisk exists...")
-    data_path = "/mnt/ramdisk/kss22050"
-phoneme_path = "/home/chang/bighard/AI/tts/dataset/kss/phoneme_cache_g2p_ko/"
+    data_path = "/mnt/ramdisk/kss"
+phoneme_path = "/home/chang/bighard/AI/tts/dataset/kss/phoneme_cache_norm_ko/"
 batch_size = 32
 if colab:
     data_path = "/content/drive/MyDrive/tts/dataset/kss/"
-    phoneme_path = "/content/drive/MyDrive/tts/dataset/kss/phoneme_cache_g2p_ko/"
+    phoneme_path = "/content/drive/MyDrive/tts/dataset/kss/phoneme_cache_norm_ko"
     batch_size = 32
-    num_worker=4
+    num_worker = 4
     
 dataset_config = BaseDatasetConfig(
     name="kss_ko",
     meta_file_train="transcript.v.1.4.txt",
-    language="ko-kr",
     path=data_path,
 )
 
-audio_config = BaseAudioConfig(
-    sample_rate=22050,
-    #resample=True,
+audio_config = VitsAudioConfig(
+    sample_rate=22050, win_length=1024, hop_length=256, num_mels=80, mel_fmin=0, mel_fmax=None,
 )
-# INITIALIZE THE TRAINING CONFIGURATION
-# Configure the model. Every config class inherits the BaseTTSConfig.
-config = GlowTTSConfig(
-    run_name="glow_tts_ko_phoneme_g2p",
+
+config = VitsConfig(
     audio=audio_config,
+    run_name="vits_kss_ko_norm_no_phoneme",
     batch_size=batch_size,
-    eval_batch_size=16,
+    eval_batch_size=12,
+    batch_group_size=5,
     num_loader_workers=num_worker,
     num_eval_loader_workers=2,
-    precompute_num_workers=num_worker,
+    precompute_num_workers=1,
     run_eval=True,
     test_delay_epochs=-1,
     epochs=1000,
-    text_cleaner="korean_phoneme_cleaners_g2p",
-    use_phonemes=True,
+    text_cleaner="korean_phoneme_cleaners_with_g2p_jamo_split",
+    use_phonemes=False,
     phoneme_language="ko",
-    phoneme_cache_path=phoneme_path,
+    #phoneme_cache_path=phoneme_path,
+    phoneme_cache_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "phoneme_cache_norm_test"),
+    compute_input_seq_cache=True,
     print_step=50,
-    save_step=5000,
-    print_eval=False,
+    print_eval=True,
     mixed_precision=True,
     output_path=output_path,
     datasets=[dataset_config],
+    cudnn_benchmark=False,
     test_sentences = [
-        # "목소리를 만드는데는 오랜 시간이 걸린다, 인내심이 필요하다.",
-        # "목소리가 되어라, 메아리가 되지말고.",
-        # "철수야 미안하다. 아무래도 그건 못하겠다.",
-        # "이 케익은 정말 맛있다. 촉촉하고 달콤하다.",
-        # "1963년 11월 23일 이전",
+        ["목소리를 만드는데는 오랜 시간이 걸린다, 인내심이 필요하다."],
+        ["목소리가 되어라, 메아리가 되지말고."],
+        ["철수야 미안하다. 아무래도 그건 못하겠다."],
+        ["이 케익은 정말 맛있다. 촉촉하고 달콤하다."],
+        ["1963년 11월 23일 이전"],
     ],
+    #use_language_weighted_sampler=True,
+    characters=CharactersConfig(
+        characters_class="TTS.tts.models.vits.VitsCharacters",
+        pad="<PAD>",
+        eos="<EOS>",
+        bos="<BOS>",
+        blank="<BLNK>",
+        characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzᄀᄁᄂᄃᄄᄅᄆᄇᄈᄉᄊᄋᄌᄍᄎᄏᄐᄑ"+"ᄒ"+"ᅡᅢᅣᅤᅥᅦᅧᅨᅩᅪᅫᅬᅭᅮᅯᅰᅱᅲᅳᅴᅵᆨᆩᆪᆫᆬᆭᆮᆯᆰᆱᆲᆳᆴᆵᆶᆷᆸᆹᆺᆻᆼᆽᆾᆿᇀᇁᇂ",
+        punctuations="!¡'(),-.:;¿? ",
+        phonemes=None,
+    ),
 )
-config.encoder_params["num_heads"] = 2
-config.encoder_params["num_layers"] = 8
 
 # INITIALIZE THE AUDIO PROCESSOR
 # Audio processor is used for feature extraction and audio I/O.
@@ -92,7 +96,7 @@ ap = AudioProcessor.init_from_config(config)
 
 # INITIALIZE THE TOKENIZER
 # Tokenizer is used to convert text to sequences of token IDs.
-# If characters are not defined in the config, default characters are passed to the config
+# config is updated with the default characters if not defined in the config.
 tokenizer, config = TTSTokenizer.init_from_config(config)
 
 # LOAD DATA SAMPLES
@@ -115,21 +119,19 @@ def formatter(root_path, manifest_file, **kwargs):  # pylint: disable=unused-arg
     speaker_name = "KBSVoice"
     with open(txt_file, "r", encoding="utf-8") as ttf:
         cnt = 0
-        data = ttf.readlines()
-        #data = random.choices(data, k=3000)
-        for line in data:
+        batch_coll = ttf.readlines()
+        #batch_coll = random.choices(batch_coll, k=1000)
+        for line in batch_coll:
             cols = line.split("|")
             wav_file = os.path.join(root_path, cols[0])
             text = cols[1]
             if len(text) <= 5:
-                continue            
+                continue    
             items.append({"text":text, "audio_file":wav_file, "speaker_name":speaker_name})
-            #cnt += 1
-            #if cnt >= 10000:
-            #if cnt >= 1000:
-            #    break
+            cnt += 1
     return items
 
+# load training samples
 train_samples, eval_samples = load_tts_samples(
     dataset_config, 
     eval_split=True, 
@@ -137,18 +139,16 @@ train_samples, eval_samples = load_tts_samples(
     eval_split_size=config.eval_split_size,
     formatter=formatter)
 
-# INITIALIZE THE MODEL
-# Models take a config object and a speaker manager as input
-# Config defines the details of the model like the number of layers, the size of the embedding, etc.
-# Speaker manager is used by multi-speaker models.
-model = GlowTTS(config, ap, tokenizer, speaker_manager=None)
+# init model
+model = Vits(config, ap, tokenizer, speaker_manager=None)
 
-# INITIALIZE THE TRAINER
-# Trainer provides a generic API to train all the 🐸TTS models with all its perks like mixed-precision training,
-# distributed training, etc.
+# init the trainer and 🚀
 trainer = Trainer(
-    TrainerArgs(), config, output_path, model=model, train_samples=train_samples, eval_samples=eval_samples
+    TrainerArgs(),
+    config,
+    output_path,
+    model=model,
+    train_samples=train_samples,
+    eval_samples=eval_samples,
 )
-
-# AND... 3,2,1... 🚀
 trainer.fit()

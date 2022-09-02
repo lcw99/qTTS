@@ -25,7 +25,6 @@ config = VitsConfig(
     batch_group_size=5,
     num_loader_workers=8,
     num_eval_loader_workers=4,
-    precompute_num_workers=1,
     run_eval=True,
     test_delay_epochs=-1,
     epochs=1000,

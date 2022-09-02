@@ -1,6 +1,4 @@
 import os
-import random
-from pathlib import Path
 
 # Trainer: Where the ✨️ happens.
 # TrainingArgs: Defines the set of arguments of the Trainer.
@@ -17,73 +15,44 @@ from TTS.tts.models.glow_tts import GlowTTS
 from TTS.tts.utils.text.tokenizer import TTSTokenizer
 from TTS.utils.audio import AudioProcessor
 
-colab = False
-if 'COLAB_GPU' in os.environ:
-    colab = True
-
 # we use the same path as this script as our training folder.
 output_path = os.path.dirname(os.path.abspath(__file__))
 
 # DEFINE DATASET CONFIG
 # Set LJSpeech as our target dataset and define its path.
 # You can also use a simple Dict to define the dataset and pass it to your custom formatter.
-data_path = "/home/chang/bighard/AI/tts/dataset/kss22050/"
-num_worker=4
-if Path("/mnt/ramdisk/kss").is_dir():
-    print("ramdisk exists...")
-    data_path = "/mnt/ramdisk/kss22050"
-phoneme_path = "/home/chang/bighard/AI/tts/dataset/kss/phoneme_cache_g2p_ko/"
-batch_size = 32
-if colab:
-    data_path = "/content/drive/MyDrive/tts/dataset/kss/"
-    phoneme_path = "/content/drive/MyDrive/tts/dataset/kss/phoneme_cache_g2p_ko/"
-    batch_size = 32
-    num_worker=4
-    
 dataset_config = BaseDatasetConfig(
-    name="kss_ko",
-    meta_file_train="transcript.v.1.4.txt",
-    language="ko-kr",
-    path=data_path,
+    name="0041_JBG",
+    meta_file_train="0041_JBG.txt",
+    path="/home/chang/bighard/AI/tts/dataset/multi_speaker/",
 )
 
 audio_config = BaseAudioConfig(
     sample_rate=22050,
-    #resample=True,
+    resample=True,
 )
 # INITIALIZE THE TRAINING CONFIGURATION
 # Configure the model. Every config class inherits the BaseTTSConfig.
 config = GlowTTSConfig(
-    run_name="glow_tts_ko_phoneme_g2p",
     audio=audio_config,
-    batch_size=batch_size,
+    batch_size=32,
     eval_batch_size=16,
-    num_loader_workers=num_worker,
-    num_eval_loader_workers=2,
-    precompute_num_workers=num_worker,
+    num_loader_workers=4,
+    num_eval_loader_workers=4,
+    precompute_num_workers=8,
     run_eval=True,
     test_delay_epochs=-1,
     epochs=1000,
-    text_cleaner="korean_phoneme_cleaners_g2p",
+    text_cleaner="korean_phoneme_cleaners_normalize",
     use_phonemes=True,
     phoneme_language="ko",
-    phoneme_cache_path=phoneme_path,
-    print_step=50,
-    save_step=5000,
+    phoneme_cache_path=os.path.join(output_path, "phoneme_cache_norm_ko_0041_JBG"),
+    print_step=25,
     print_eval=False,
     mixed_precision=True,
     output_path=output_path,
     datasets=[dataset_config],
-    test_sentences = [
-        # "목소리를 만드는데는 오랜 시간이 걸린다, 인내심이 필요하다.",
-        # "목소리가 되어라, 메아리가 되지말고.",
-        # "철수야 미안하다. 아무래도 그건 못하겠다.",
-        # "이 케익은 정말 맛있다. 촉촉하고 달콤하다.",
-        # "1963년 11월 23일 이전",
-    ],
 )
-config.encoder_params["num_heads"] = 2
-config.encoder_params["num_layers"] = 8
 
 # INITIALIZE THE AUDIO PROCESSOR
 # Audio processor is used for feature extraction and audio I/O.
@@ -112,19 +81,17 @@ def formatter(root_path, manifest_file, **kwargs):  # pylint: disable=unused-arg
     """
     txt_file = os.path.join(root_path, manifest_file)
     items = []
-    speaker_name = "KBSVoice"
+    speaker_name = "0041_JBG"
     with open(txt_file, "r", encoding="utf-8") as ttf:
         cnt = 0
-        data = ttf.readlines()
-        #data = random.choices(data, k=3000)
-        for line in data:
+        for line in ttf:
             cols = line.split("|")
-            wav_file = os.path.join(root_path, cols[0])
-            text = cols[1]
-            if len(text) <= 5:
-                continue            
+            speaker = cols[1]
+            wav_file = os.path.join(root_path, speaker, cols[0])
+            speaker = cols[1]
+            text = cols[2]
             items.append({"text":text, "audio_file":wav_file, "speaker_name":speaker_name})
-            #cnt += 1
+            cnt += 1
             #if cnt >= 10000:
             #if cnt >= 1000:
             #    break

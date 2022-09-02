@@ -1,5 +1,4 @@
 import os
-import random
 from pathlib import Path
 
 # Trainer: Where the ✨️ happens.
@@ -28,7 +27,7 @@ output_path = os.path.dirname(os.path.abspath(__file__))
 # Set LJSpeech as our target dataset and define its path.
 # You can also use a simple Dict to define the dataset and pass it to your custom formatter.
 data_path = "/home/chang/bighard/AI/tts/dataset/kss22050/"
-num_worker=4
+num_worker=8
 if Path("/mnt/ramdisk/kss").is_dir():
     print("ramdisk exists...")
     data_path = "/mnt/ramdisk/kss22050"
@@ -59,7 +58,7 @@ config = GlowTTSConfig(
     batch_size=batch_size,
     eval_batch_size=16,
     num_loader_workers=num_worker,
-    num_eval_loader_workers=2,
+    num_eval_loader_workers=4,
     precompute_num_workers=num_worker,
     run_eval=True,
     test_delay_epochs=-1,
@@ -115,9 +114,7 @@ def formatter(root_path, manifest_file, **kwargs):  # pylint: disable=unused-arg
     speaker_name = "KBSVoice"
     with open(txt_file, "r", encoding="utf-8") as ttf:
         cnt = 0
-        data = ttf.readlines()
-        #data = random.choices(data, k=3000)
-        for line in data:
+        for line in ttf:
             cols = line.split("|")
             wav_file = os.path.join(root_path, cols[0])
             text = cols[1]
