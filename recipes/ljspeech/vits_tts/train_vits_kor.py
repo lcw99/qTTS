@@ -27,7 +27,7 @@ data_path = "/home/chang/bighard/AI/tts/dataset/kss22050/"
 if Path("/mnt/ramdisk/kss").is_dir():
     print("ramdisk exists...")
     data_path = "/mnt/ramdisk/kss"
-phoneme_path = "/home/chang/bighard/AI/tts/dataset/ks22050/phoneme_cache_norm_ko/"
+phoneme_path = "/home/chang/tts_dataset/ks22050/phoneme_cache_norm_ko/"
 batch_size = 32
 if colab:
     data_path = "/content/drive/MyDrive/tts/dataset/kss/"
