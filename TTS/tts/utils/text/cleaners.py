@@ -14,9 +14,8 @@ from .french.abbreviations import abbreviations_fr
 
 from .korean.korean import tokenize as ko_tokenize
 from .korean.korean import normalize as ko_normalize
-from g2pk import G2p
-
-g2p = G2p()
+#from g2pk import G2p
+#g2p = G2p()
 
 from hangul_utils import split_syllables, join_jamos
 # Regular expression matching whitespace:
@@ -168,7 +167,7 @@ def korean_phoneme_cleaners_g2p(text):
     #print("!", text)
     text = multilingual_cleaners(text)
     text = ko_normalize(text)
-    text = g2p(text)
+    #text = g2p(text)
     #print(">", text)
     return text
 
@@ -176,6 +175,6 @@ def korean_phoneme_cleaners_with_g2p_jamo_split(text):
     """Pipeline for Korean text, including number and abbreviation expansion."""
     text = multilingual_cleaners(text)
     text = ko_normalize(text)
-    text = g2p(text)
+    #text = g2p(text)
     text = ko_tokenize(text)
     return text
